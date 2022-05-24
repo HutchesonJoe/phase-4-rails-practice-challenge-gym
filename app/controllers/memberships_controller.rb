@@ -1,4 +1,6 @@
 class MembershipsController < ApplicationController
+  rescue_from ActiveRecord::RecordNotFound, with: :render_not_found_response
+  rescue_from ActiveRecord::RecordInvalid, with: :record_invalid_response
 
   def index
     memberships = Membership.all 
@@ -6,10 +8,8 @@ class MembershipsController < ApplicationController
   end
 
   def create
-    client = Client.find_by(id: params[:client_id])
-    # byebug
-    if client.gyms.find(params[:gym_id])
-      render json: "Membership exists!"
+    if client_membership?
+      render json: "Membership already exists!"
     else 
       membership = Membership.create(member_params)
       render json: membership, status: :created
@@ -17,8 +17,20 @@ class MembershipsController < ApplicationController
   end
 
   private
+  def client_membership?
+    client = Client.find(params[:client_id])
+    gym = client.gyms.find_by(id: params[:gym_id])
+  end
 
   def member_params
     params.permit(:gym_id, :client_id, :charge)
+  end
+
+  def render_not_found_response(invalid)
+    render json: { errors: invalid }, status: :not_found
+  end
+
+  def record_invalid_response(invalid)
+    render json: { errors: invalid.record.errors.full_messages }, status: :unprocessable_entity
   end
 end
